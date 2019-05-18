@@ -1,0 +1,304 @@
+{\rtf1\ansi\ansicpg1252\deff0\nouicompat\deflang1033{\fonttbl{\f0\fnil Consolas;}{\f1\fnil\fcharset0 Calibri;}}
+{\colortbl ;\red0\green0\blue255;\red255\green255\blue255;\red0\green0\blue0;\red163\green21\blue21;\red47\green79\blue79;\red0\green128\blue0;\red128\green128\blue128;\red111\green0\blue138;\red43\green145\blue175;}
+{\*\generator Riched20 6.3.9600}\viewkind4\uc1 
+\pard\sa200\sl276\slmult1\cf1\highlight2\f0\fs19\lang9 #include\cf3  \cf4 <GL/glut.h>\cf3\par
+\cf1 #include\cf3  \cf4 <math.h>\cf3\par
+\cf1 enum\cf3  \{\par
+\tab\cf5 CSG_A\cf3 , \cf5 CSG_B\cf3 , \cf5 CSG_A_OR_B\cf3 , \cf5 CSG_A_AND_B\cf3 , \cf5 CSG_A_SUB_B\cf3 , \cf5 CSG_B_SUB_A\cf3\par
+\};\par
+\par
+\cf6 /* just draw single object */\cf3\par
+\cf1 void\cf3  one(\cf1 void\cf3 (*\cf7 a\cf3 ) (\cf1 void\cf3 ))\par
+\{\par
+\tab glEnable(\cf8 GL_DEPTH_TEST\cf3 );\par
+\tab\cf7 a\cf3 ();\par
+\tab glDisable(\cf8 GL_DEPTH_TEST\cf3 );\par
+\}\par
+\cf6 /* "or" is easy; simply draw both objects with depth buffering on */\cf3\par
+\cf1 void\cf3  or(\cf1 void\cf3 (*\cf7 a\cf3 ) (\cf1 void\cf3 ), \cf1 void\cf3 (*\cf7 b\cf3 ) (\cf1 void\cf3 ))\par
+\{\par
+\tab glEnable(\cf8 GL_DEPTH_TEST\cf3 );\par
+\tab\cf7 a\cf3 ();\par
+\tab\cf7 b\cf3 ();\par
+\tab glDisable(\cf8 GL_DEPTH_TEST\cf3 );\par
+\}\par
+\cf6 /* Set stencil buffer to show the part of a (front or back face) that's inside b's volume. Requirements: GL_CULL_FACE enabled, depth func GL_LESS Side effects: depth test, stencil func, stencil op */\cf3\par
+\cf1 void\cf3\par
+firstInsideSecond(\cf1 void\cf3 (*\cf7 a\cf3 ) (\cf1 void\cf3 ), \cf1 void\cf3 (*\cf7 b\cf3 ) (\cf1 void\cf3 ), \cf9 GLenum\cf3  \cf7 face\cf3 , \cf9 GLenum\cf3  \cf7 test\cf3 )\par
+\{\par
+\tab glEnable(\cf8 GL_DEPTH_TEST\cf3 );\par
+\tab glColorMask(\cf8 GL_FALSE\cf3 , \cf8 GL_FALSE\cf3 , \cf8 GL_FALSE\cf3 , \cf8 GL_FALSE\cf3 );\par
+\tab glCullFace(\cf7 face\cf3 );     \cf6 /* controls which face of a to use */\cf3\par
+\tab\cf7 a\cf3 ();                           \cf6 /* draw a face of a into depth buffer */\cf3\par
+\tab\cf6 /* use stencil plane to find parts of a in b */\cf3\par
+\tab glDepthMask(\cf8 GL_FALSE\cf3 );\par
+\tab glEnable(\cf8 GL_STENCIL_TEST\cf3 );\par
+\tab glStencilFunc(\cf8 GL_ALWAYS\cf3 , 0, 0);\par
+\tab glStencilOp(\cf8 GL_KEEP\cf3 , \cf8 GL_KEEP\cf3 , \cf8 GL_INCR\cf3 );\par
+\tab glCullFace(\cf8 GL_BACK\cf3 );\par
+\tab\cf7 b\cf3 ();                  \cf6 /* increment the stencil where the front face of b is drawn */\cf3\par
+\tab glStencilOp(\cf8 GL_KEEP\cf3 , \cf8 GL_KEEP\cf3 , \cf8 GL_DECR\cf3 );\par
+\tab glCullFace(\cf8 GL_FRONT\cf3 );\par
+\tab\cf7 b\cf3 ();                  \cf6 /* decrement the stencil buffer where the back face of b is drawn */\cf3\par
+\tab glDepthMask(\cf8 GL_TRUE\cf3 );\par
+\tab glColorMask(\cf8 GL_TRUE\cf3 , \cf8 GL_TRUE\cf3 , \cf8 GL_TRUE\cf3 , \cf8 GL_TRUE\cf3 );\par
+\tab glStencilFunc(\cf7 test\cf3 , 0, 1);\par
+\tab glDisable(\cf8 GL_DEPTH_TEST\cf3 );\par
+\tab glCullFace(\cf7 face\cf3 );\par
+\tab\cf7 a\cf3 ();                  \cf6 /* draw the part of a that's in b */\cf3\par
+\}\par
+\par
+\cf1 void\cf3\par
+fixDepth(\cf1 void\cf3 (*\cf7 a\cf3 ) (\cf1 void\cf3 ))\par
+\{\par
+\tab glColorMask(\cf8 GL_FALSE\cf3 , \cf8 GL_FALSE\cf3 , \cf8 GL_FALSE\cf3 , \cf8 GL_FALSE\cf3 );\par
+\tab glEnable(\cf8 GL_DEPTH_TEST\cf3 );\par
+\tab glDisable(\cf8 GL_STENCIL_TEST\cf3 );\par
+\tab glDepthFunc(\cf8 GL_ALWAYS\cf3 );\par
+\tab\cf7 a\cf3 ();                  \cf6 /* draw the front face of a, fixing the depth buffer */\cf3\par
+\tab glDepthFunc(\cf8 GL_LESS\cf3 );\par
+\}\par
+\cf6 /* "and" two objects together */\cf3\par
+\cf1 void\cf3\par
+and(\cf1 void\cf3 (*\cf7 a\cf3 ) (\cf1 void\cf3 ), \cf1 void\cf3 (*\cf7 b\cf3 ) (\cf1 void\cf3 ))\par
+\{\par
+\tab firstInsideSecond(\cf7 a\cf3 , \cf7 b\cf3 , \cf8 GL_BACK\cf3 , \cf8 GL_NOTEQUAL\cf3 );\par
+\tab fixDepth(\cf7 b\cf3 );\par
+\tab firstInsideSecond(\cf7 b\cf3 , \cf7 a\cf3 , \cf8 GL_BACK\cf3 , \cf8 GL_NOTEQUAL\cf3 );\par
+\tab glDisable(\cf8 GL_STENCIL_TEST\cf3 );  \cf6 /* reset things */\cf3\par
+\}\par
+\cf6 /* subtract b from a */\cf3\par
+\cf1 void\cf3\par
+sub(\cf1 void\cf3 (*\cf7 a\cf3 ) (\cf1 void\cf3 ), \cf1 void\cf3 (*\cf7 b\cf3 ) (\cf1 void\cf3 ))\par
+\{\par
+\tab firstInsideSecond(\cf7 a\cf3 , \cf7 b\cf3 , \cf8 GL_FRONT\cf3 , \cf8 GL_NOTEQUAL\cf3 );\par
+\tab fixDepth(\cf7 b\cf3 );\par
+\tab firstInsideSecond(\cf7 b\cf3 , \cf7 a\cf3 , \cf8 GL_BACK\cf3 , \cf8 GL_EQUAL\cf3 );\par
+\tab glDisable(\cf8 GL_STENCIL_TEST\cf3 );  \cf6 /* reset things */\cf3\par
+\}\par
+\par
+\cf1 enum\cf3  \{\par
+\tab\cf5 SPHERE\cf3  = 1, \cf5 CONE\cf3\par
+\};\par
+\par
+\cf6 /* Draw a cone */\cf3\par
+\cf9 GLfloat\cf3  coneX = 0.f, coneY = 0.f, coneZ = 0.f;\par
+\cf1 void\cf3\par
+cone(\cf1 void\cf3 )\par
+\{\par
+\tab glPushMatrix();\par
+\tab glTranslatef(coneX, coneY, coneZ);\par
+\tab glTranslatef(0.f, 0.f, -30.f);\par
+\tab glCallList(\cf5 CONE\cf3 );\par
+\tab glPopMatrix();\par
+\}\par
+\par
+\cf6 /* Draw a sphere */\cf3\par
+\cf9 GLfloat\cf3  sphereX = 0.f, sphereY = 0.f, sphereZ = 0.f;\par
+\cf1 void\cf3\par
+sphere(\cf1 void\cf3 )\par
+\{\par
+\tab glPushMatrix();\par
+\tab glTranslatef(sphereX, sphereY, sphereZ);\par
+\tab glCallList(\cf5 SPHERE\cf3 );\par
+\tab glPopMatrix();\par
+\}\par
+\cf1 int\cf3  csg_op = \cf5 CSG_A\cf3 ;\par
+\par
+\cf6 /* add menu callback */\cf3\par
+\cf1 void\cf3\par
+menu(\cf1 int\cf3  \cf7 csgop\cf3 )\par
+\{\par
+\tab csg_op = \cf7 csgop\cf3 ;\par
+\tab glutPostRedisplay();\par
+\}\par
+\par
+\cf9 GLfloat\cf3  viewangle;\par
+\cf1 void\cf3\par
+redraw(\cf1 void\cf3 )\par
+\{\par
+\tab\cf6 /* clear stencil each time */\cf3\par
+\tab glClear(\cf8 GL_COLOR_BUFFER_BIT\cf3  | \cf8 GL_DEPTH_BUFFER_BIT\cf3  | \cf8 GL_STENCIL_BUFFER_BIT\cf3 );\par
+\tab glPushMatrix();\par
+\tab glRotatef(viewangle, 0.f, 1.f, 0.f);\par
+\tab\cf1 switch\cf3  (csg_op) \{\par
+\tab\cf1 case\cf3  \cf5 CSG_A\cf3 :    one(cone);\par
+\tab\tab\cf1 break\cf3 ;\par
+\tab\cf1 case\cf3  \cf5 CSG_B\cf3 :    one(sphere);\par
+\tab\tab\cf1 break\cf3 ;\par
+\par
+\tab\cf1 case\cf3  \cf5 CSG_A_OR_B\cf3 :    or(cone, sphere);\par
+\tab\tab\cf1 break\cf3 ;\par
+\tab\cf1 case\cf3  \cf5 CSG_A_AND_B\cf3 :    and(cone, sphere);\par
+\tab\tab\cf1 break\cf3 ;\par
+\tab\cf1 case\cf3  \cf5 CSG_A_SUB_B\cf3 :    sub(cone, sphere);\par
+\tab\tab\cf1 break\cf3 ;\par
+\tab\cf1 case\cf3  \cf5 CSG_B_SUB_A\cf3 :    sub(sphere, cone);\par
+\tab\tab\cf1 break\cf3 ;\par
+\tab\}\par
+\tab glPopMatrix();\par
+\tab glutSwapBuffers();\par
+\}\par
+\cf6 /* animate scene by rotating */\cf3\par
+\cf1 enum\cf3  \{\par
+\tab\cf5 ANIM_LEFT\cf3 , \cf5 ANIM_RIGHT\cf3\par
+\};\par
+\cf1 int\cf3  animDirection = \cf5 ANIM_LEFT\cf3 ;\par
+\par
+\cf1 void\cf3\par
+anim(\cf1 void\cf3 )\par
+\{\par
+\tab\cf1 if\cf3  (animDirection == \cf5 ANIM_LEFT\cf3 )\par
+\tab\tab viewangle -= 3.f;\par
+\tab\cf1 else\cf3\par
+\tab\tab viewangle += 3.f;\par
+\tab glutPostRedisplay();\par
+\}\par
+\par
+\cf6 /* ARGSUSED1 */\cf3\par
+\cf6 /* special keys, like array and F keys */\cf3\par
+\cf1 void\cf3\par
+special(\cf1 int\cf3  \cf7 key\cf3 , \cf1 int\cf3  \cf7 x\cf3 , \cf1 int\cf3  \cf7 y\cf3 )\par
+\{\par
+\tab\cf1 switch\cf3  (\cf7 key\cf3 ) \{\par
+\tab\cf1 case\cf3  \cf8 GLUT_KEY_LEFT\cf3 :    glutIdleFunc(anim);\par
+\tab\tab animDirection = \cf5 ANIM_LEFT\cf3 ;\par
+\tab\tab\cf1 break\cf3 ;\par
+\tab\cf1 case\cf3  \cf8 GLUT_KEY_RIGHT\cf3 :    glutIdleFunc(anim);\par
+\tab\tab animDirection = \cf5 ANIM_RIGHT\cf3 ;\par
+\tab\tab\cf1 break\cf3 ;\par
+\tab\cf1 case\cf3  \cf8 GLUT_KEY_UP\cf3 :\par
+\tab\cf1 case\cf3  \cf8 GLUT_KEY_DOWN\cf3 :\par
+\tab\tab glutIdleFunc(0);\par
+\tab\tab\cf1 break\cf3 ;\par
+\tab\}\par
+\}\par
+\cf6 /* ARGSUSED1 */\cf3\par
+\cf1 void\cf3\par
+key(\cf1 unsigned\cf3  \cf1 char\cf3  \cf7 key\cf3 , \cf1 int\cf3  \cf7 x\cf3 , \cf1 int\cf3  \cf7 y\cf3 )\par
+\{\par
+\tab\cf1 switch\cf3  (\cf7 key\cf3 ) \{\par
+\tab\cf1 case\cf3  \cf4 'a'\cf3 : viewangle -= 10.f;\par
+\tab\tab glutPostRedisplay();\par
+\tab\tab\cf1 break\cf3 ;\par
+\tab\cf1 case\cf3  \cf4 's'\cf3 :\par
+\tab\tab viewangle += 10.f;\par
+\tab\tab glutPostRedisplay();\par
+\tab\tab\cf1 break\cf3 ;\par
+\tab\cf1 case\cf3  \cf4 '\\033'\cf3 :\par
+\tab\tab exit(0);\par
+\tab\}\par
+\}\par
+\par
+\cf1 int\cf3  picked_object;\par
+\cf1 int\cf3  xpos = 0, ypos = 0;\par
+\cf1 int\cf3  newxpos, newypos;\par
+\cf1 int\cf3  startx, starty;\par
+\par
+\cf1 void\cf3\par
+mouse(\cf1 int\cf3  \cf7 button\cf3 , \cf1 int\cf3  \cf7 state\cf3 , \cf1 int\cf3  \cf7 x\cf3 , \cf1 int\cf3  \cf7 y\cf3 )\par
+\{\par
+\tab\cf1 if\cf3  (\cf7 state\cf3  == \cf8 GLUT_UP\cf3 ) \{\par
+\tab\tab picked_object = \cf7 button\cf3 ;\par
+\tab\tab xpos += newxpos;\par
+\tab\tab ypos += newypos;\par
+\tab\tab newxpos = 0;\par
+\tab\tab newypos = 0;\par
+\tab\}\par
+\tab\cf1 else\cf3  \{              \cf6 /* GLUT_DOWN */\cf3\par
+\tab\tab startx = \cf7 x\cf3 ;\par
+\tab\tab starty = \cf7 y\cf3 ;\par
+\tab\}\par
+\}\par
+\cf1 #define\cf3  \cf8 DEGTORAD\cf3  (2 * 3.1415 / 360)\par
+\cf1 void\cf3\par
+motion(\cf1 int\cf3  \cf7 x\cf3 , \cf1 int\cf3  \cf7 y\cf3 )\par
+\{\par
+\tab\cf9 GLfloat\cf3  r, objx, objy, objz;\par
+\par
+\tab newxpos = \cf7 x\cf3  - startx;\par
+\tab newypos = starty - \cf7 y\cf3 ;\par
+\par
+\tab r = (newxpos + xpos) * 50.f / 512.f;\par
+\tab objx = r * cos(viewangle * \cf8 DEGTORAD\cf3 );\par
+\tab objy = (newypos + ypos) * 50.f / 512.f;\par
+\tab objz = r * sin(viewangle * \cf8 DEGTORAD\cf3 );\par
+\par
+\tab\cf1 switch\cf3  (picked_object) \{\par
+\tab\cf1 case\cf3  \cf5 CSG_A\cf3 :\par
+\tab\tab coneX = objx;\par
+\tab\tab coneY = objy;\par
+\tab\tab coneZ = objz;\par
+\tab\tab\cf1 break\cf3 ;\par
+\tab\cf1 case\cf3  \cf5 CSG_B\cf3 :\par
+\tab\tab sphereX = objx;\par
+\tab\tab sphereY = objy;\par
+\tab\tab sphereZ = objz;\par
+\tab\tab\cf1 break\cf3 ;\par
+\tab\}\par
+\tab glutPostRedisplay();\par
+\}\par
+\par
+\cf1 int\cf3  main(\cf1 int\cf3  \cf7 argc\cf3 , \cf1 char\cf3  **\cf7 argv\cf3 )\par
+\{\par
+\tab\cf1 static\cf3  \cf9 GLfloat\cf3  lightpos[] =\par
+\tab\{ 25.f, 50.f, -50.f, 1.f \};\par
+\tab\cf1 static\cf3  \cf9 GLfloat\cf3  sphere_mat[] =\par
+\tab\{ 1.f, .5f, 0.f, 1.f \};\par
+\tab\cf1 static\cf3  \cf9 GLfloat\cf3  cone_mat[] =\par
+\tab\{ 0.f, .5f, 1.f, 1.f \};\par
+\tab\cf9 GLUquadricObj\cf3  *sphere, *cone, *base;\par
+\par
+\tab\cf8 glutInit\cf3 (&\cf7 argc\cf3 , \cf7 argv\cf3 );\par
+\tab glutInitWindowSize(512, 512);\par
+\tab glutInitDisplayMode(\cf8 GLUT_STENCIL\cf3  | \cf8 GLUT_DEPTH\cf3  | \cf8 GLUT_DOUBLE\cf3 );\par
+\tab (\cf1 void\cf3 )\cf8 glutCreateWindow\cf3 (\cf4 "csg"\cf3 );\par
+\tab glutDisplayFunc(redraw);\par
+\tab glutKeyboardFunc(key);\par
+\tab glutSpecialFunc(special);\par
+\tab glutMouseFunc(mouse);\par
+\tab glutMotionFunc(motion);\par
+\par
+\tab\cf8 glutCreateMenu\cf3 (menu);\par
+\tab glutAddMenuEntry(\cf4 "A only"\cf3 , \cf5 CSG_A\cf3 );\par
+\tab glutAddMenuEntry(\cf4 "B only"\cf3 , \cf5 CSG_B\cf3 );\par
+\tab glutAddMenuEntry(\cf4 "A or B"\cf3 , \cf5 CSG_A_OR_B\cf3 );\par
+\tab glutAddMenuEntry(\cf4 "A and B"\cf3 , \cf5 CSG_A_AND_B\cf3 );\par
+\tab glutAddMenuEntry(\cf4 "A sub B"\cf3 , \cf5 CSG_A_SUB_B\cf3 );\par
+\tab glutAddMenuEntry(\cf4 "B sub A"\cf3 , \cf5 CSG_B_SUB_A\cf3 );\par
+\tab glutAttachMenu(\cf8 GLUT_RIGHT_BUTTON\cf3 );\par
+\par
+\tab glEnable(\cf8 GL_CULL_FACE\cf3 );\par
+\tab glEnable(\cf8 GL_LIGHTING\cf3 );\par
+\tab glEnable(\cf8 GL_LIGHT0\cf3 );\par
+\par
+\tab glLightfv(\cf8 GL_LIGHT0\cf3 , \cf8 GL_POSITION\cf3 , lightpos);\par
+\tab glLightModeli(\cf8 GL_LIGHT_MODEL_TWO_SIDE\cf3 , \cf8 GL_TRUE\cf3 );\par
+\par
+\tab\cf6 /* make display lists for sphere and cone; for efficiency */\cf3\par
+\par
+\tab glNewList(\cf5 SPHERE\cf3 , \cf8 GL_COMPILE\cf3 );\par
+\tab sphere = gluNewQuadric();\par
+\tab glMaterialfv(\cf8 GL_FRONT_AND_BACK\cf3 , \cf8 GL_AMBIENT_AND_DIFFUSE\cf3 , sphere_mat);\par
+\tab gluSphere(sphere, 20.f, 64, 64);\par
+\tab gluDeleteQuadric(sphere);\par
+\tab glEndList();\par
+\tab glNewList(\cf5 CONE\cf3 , \cf8 GL_COMPILE\cf3 );\par
+\tab cone = gluNewQuadric();\par
+\tab base = gluNewQuadric();\par
+\tab glMaterialfv(\cf8 GL_FRONT_AND_BACK\cf3 , \cf8 GL_AMBIENT_AND_DIFFUSE\cf3 , cone_mat);\par
+\tab gluQuadricOrientation(base, \cf8 GLU_INSIDE\cf3 );\par
+\tab gluDisk(base, 0., 15., 64, 1);\par
+\tab gluCylinder(cone, 15., 0., 60., 64, 64);\par
+\tab gluDeleteQuadric(cone);\par
+\tab gluDeleteQuadric(base);\par
+\tab glEndList();\par
+\tab glMatrixMode(\cf8 GL_PROJECTION\cf3 );\par
+\tab glOrtho(-50., 50., -50., 50., -50., 50.);\par
+\tab glMatrixMode(\cf8 GL_MODELVIEW\cf3 );\par
+\tab glutMainLoop();\par
+\tab\cf1 return\cf3  0;             \cf6 /* ANSI C requires main to return int. */\cf3\par
+\}\par
+\cf0\highlight0\f1\fs22\par
+}
+ 
